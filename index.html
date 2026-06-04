@@ -833,8 +833,8 @@ function toast(msg,dur=2800){
    AUTO-LOAD SAVED CONFIG
 ══════════════════════════════════════════ */
 (function autoLoad(){
-  const url=localStorage.getItem(CFG_URL_KEY);
-  const key=localStorage.getItem(CFG_KEY_KEY);
+const HARDCODED_URL = "https://sbmodsxvdjzprsxzeopx.supabase.co";
+const HARDCODED_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNibW9kc3h2ZGp6cHJzeHplb3B4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1NzM0NjgsImV4cCI6MjA5NjE0OTQ2OH0.pzJchVRZ4D4mtRHWdaw1iZnzyBKzAJv1Ukb2jjpVBvg";
   if(url && key){
     document.getElementById('cfg-url').value=url;
     document.getElementById('cfg-key').value=key;
