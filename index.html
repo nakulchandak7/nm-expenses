@@ -830,16 +830,31 @@ function toast(msg,dur=2800){
 }
 
 /* ══════════════════════════════════════════
-   AUTO-LOAD SAVED CONFIG
+   HARDCODED CREDENTIALS — EDIT THESE
+   Paste your Supabase values below.
+   Once filled in, the setup screen never
+   appears on any device ever again.
 ══════════════════════════════════════════ */
+const HARDCODED_URL = "https://sbmodsxvdjzprsxzeopx.supabase.co";  // paste your Project URL here
+const HARDCODED_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNibW9kc3h2ZGp6cHJzeHplb3B4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1NzM0NjgsImV4cCI6MjA5NjE0OTQ2OH0.pzJchVRZ4D4mtRHWdaw1iZnzyBKzAJv1Ukb2jjpVBvg";  // paste your anon key here
+
 (function autoLoad(){
-const HARDCODED_URL = "https://sbmodsxvdjzprsxzeopx.supabase.co";
-const HARDCODED_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNibW9kc3h2ZGp6cHJzeHplb3B4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1NzM0NjgsImV4cCI6MjA5NjE0OTQ2OH0.pzJchVRZ4D4mtRHWdaw1iZnzyBKzAJv1Ukb2jjpVBvg";
+  // Priority 1: hardcoded values in the file
+  if(HARDCODED_URL && HARDCODED_KEY){
+    document.getElementById('setup-screen').style.display='none';
+    initApp(HARDCODED_URL, HARDCODED_KEY);
+    return;
+  }
+  // Priority 2: previously saved in localStorage
+  const url=localStorage.getItem(CFG_URL_KEY);
+  const key=localStorage.getItem(CFG_KEY_KEY);
   if(url && key){
     document.getElementById('cfg-url').value=url;
     document.getElementById('cfg-key').value=key;
     initApp(url,key);
+    return;
   }
+  // Priority 3: show setup screen (fallback)
 })();
 </script>
 </body>
