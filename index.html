@@ -170,8 +170,6 @@ input[type=date]::-webkit-calendar-picker-indicator{opacity:.5;cursor:pointer}
 .payer-tag.n{background:var(--nakul-bg);color:var(--nakul)}.payer-tag.m{background:var(--minal-bg);color:var(--minal)}
 .entry-date-badge{display:inline-flex;align-items:center;gap:.3rem;font-size:.72rem;font-weight:600;background:var(--bg);border:1px solid var(--rule);border-radius:.35rem;padding:.18rem .5rem;color:var(--ink);letter-spacing:.01em}
 .entry-date-badge svg{opacity:.5}
-.entry-del{background:none;border:none;cursor:pointer;padding:.3rem;color:var(--muted);border-radius:.3rem;transition:color .2s,background .2s;flex-shrink:0}
-.entry-del:hover{color:#d44;background:#fdf0f0}
 
 /* ANALYSIS */
 .bar-list{display:flex;flex-direction:column;gap:.65rem}
@@ -196,8 +194,20 @@ svg.donut{transform:rotate(-90deg)}
 /* MODAL */
 .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.4);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;z-index:200;opacity:0;pointer-events:none;transition:opacity .2s}
 .modal-bg.open{opacity:1;pointer-events:all}
-.modal{background:var(--surface);border:1px solid var(--rule);border-radius:1rem;padding:1.75rem;width:min(22rem,92vw);transform:scale(.96) translateY(8px);transition:transform .22s,opacity .22s;opacity:0}
+.modal{background:var(--surface);border:1px solid var(--rule);border-radius:1rem;padding:1.75rem;width:min(26rem,94vw);transform:scale(.96) translateY(8px);transition:transform .22s,opacity .22s;opacity:0;max-height:90vh;overflow-y:auto}
 .modal-bg.open .modal{transform:scale(1) translateY(0);opacity:1}
+
+/* EDIT MODAL specifics */
+.edit-amount-wrap{position:relative}
+.edit-amount-prefix{position:absolute;left:.9rem;top:50%;transform:translateY(-50%);font-family:'Fraunces',serif;font-size:1.1rem;color:var(--muted);pointer-events:none}
+.edit-amount-wrap input{padding-left:2rem;font-family:'Fraunces',serif;font-size:clamp(16px,1.4rem,1.4rem);font-weight:700;letter-spacing:-.02em}
+.edit-paid-toggle{display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-bottom:0}
+.edit-cat-grid{display:flex;flex-wrap:wrap;gap:.45rem}
+
+/* ENTRY ACTIONS */
+.entry-actions{display:flex;gap:.35rem;flex-shrink:0}
+.entry-edit{background:none;border:none;cursor:pointer;padding:.3rem;color:var(--muted);border-radius:.3rem;transition:color .2s,background .2s}
+.entry-edit:hover{color:var(--minal);background:var(--minal-bg)}
 .modal-title{font-family:'Fraunces',serif;font-size:1.05rem;font-weight:600;margin-bottom:1.25rem}
 .modal-row{display:grid;grid-template-columns:3.2rem 1fr;gap:.6rem;margin-bottom:.75rem}
 .emoji-inp{font-size:1.3rem;text-align:center;background:var(--bg);border:1.5px solid var(--rule);border-radius:.55rem;padding:.5rem .3rem;cursor:text;outline:none;transition:border-color .2s}
@@ -351,6 +361,55 @@ svg.donut{transform:rotate(-90deg)}
 
 <div id="toast"></div>
 
+<!-- EDIT MODAL -->
+<div class="modal-bg" id="editModal">
+  <div class="modal">
+    <div class="modal-title">Edit Expense</div>
+
+    <div class="field">
+      <label>Amount</label>
+      <div class="edit-amount-wrap">
+        <span class="edit-amount-prefix">₹</span>
+        <input type="number" id="edit-amount" placeholder="0.00" min="0" step="0.01">
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Date of Expense</label>
+      <input type="date" id="edit-date">
+    </div>
+
+    <div class="field">
+      <label>Paid by</label>
+      <div class="edit-paid-toggle">
+        <div class="paid-opt" id="edit-opt-nakul" onclick="editSelectPayer('nakul')">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+          Nakul
+        </div>
+        <div class="paid-opt" id="edit-opt-minal" onclick="editSelectPayer('minal')">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+          Minal
+        </div>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Category</label>
+      <div class="edit-cat-grid" id="edit-cat-grid"></div>
+    </div>
+
+    <div class="field">
+      <label>Notes</label>
+      <textarea id="edit-notes" placeholder="What was this for? (optional)" style="min-height:4rem"></textarea>
+    </div>
+
+    <div class="modal-actions">
+      <button class="modal-btn" onclick="closeEditModal()">Cancel</button>
+      <button class="modal-btn primary" id="edit-save-btn" onclick="saveEdit()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
 <!-- CATEGORY MODAL -->
 <div class="modal-bg" id="catModal">
   <div class="modal">
@@ -502,6 +561,20 @@ function subscribeRealtime(){
         expenses.sort((a,b)=> new Date(b.expenseDate) - new Date(a.expenseDate));
         renderAll();
         toast('✦ New expense added');
+      }
+    )
+    .on('postgres_changes',
+      {event:'UPDATE', schema:'public', table:'expenses'},
+      payload => {
+        const updated = dbToLocal(payload.new);
+        const idx = expenses.findIndex(e=>String(e.id)===String(updated.id));
+        if(idx>-1){
+          // Don't overwrite if this device just saved it (already updated locally)
+          expenses[idx] = updated;
+          expenses.sort((a,b)=>new Date(b.expenseDate)-new Date(a.expenseDate));
+          renderAll();
+          toast('✦ Expense updated');
+        }
       }
     )
     .on('postgres_changes',
@@ -729,6 +802,104 @@ async function delEntry(id){
 }
 
 /* ══════════════════════════════════════════
+   EDIT ENTRY
+══════════════════════════════════════════ */
+let editingId = null;
+let editSelPayer = 'nakul';
+let editSelCat = '';
+
+function openEditModal(id){
+  const e = expenses.find(x=>String(x.id)===String(id));
+  if(!e) return;
+  editingId   = String(id);
+  editSelPayer = e.payer;
+  editSelCat   = String(e.cat);
+
+  // populate fields
+  document.getElementById('edit-amount').value = e.amount;
+  document.getElementById('edit-date').value   = e.expenseDate || e.date.slice(0,10);
+  document.getElementById('edit-notes').value  = e.notes || '';
+
+  // payer buttons
+  editSelectPayer(e.payer);
+
+  // category pills
+  renderEditCats();
+
+  document.getElementById('editModal').classList.add('open');
+}
+
+function closeEditModal(){
+  document.getElementById('editModal').classList.remove('open');
+  editingId = null;
+}
+
+document.getElementById('editModal').addEventListener('click', e=>{
+  if(e.target===e.currentTarget) closeEditModal();
+});
+
+function editSelectPayer(p){
+  editSelPayer = p;
+  document.getElementById('edit-opt-nakul').className = 'paid-opt' + (p==='nakul' ? ' sel-n' : '');
+  document.getElementById('edit-opt-minal').className = 'paid-opt' + (p==='minal' ? ' sel-m' : '');
+}
+
+function editSelectCat(id){
+  editSelCat = String(editSelCat)===String(id) ? '' : String(id);
+  renderEditCats();
+}
+
+function renderEditCats(){
+  const g = document.getElementById('edit-cat-grid');
+  if(!g) return;
+  const cur = String(editSelCat);
+  g.innerHTML = CATS.map(c=>{
+    const cid = String(c.id);
+    return`<div class="cat-pill${cur===cid?' active':''}" onclick="editSelectCat('${cid}')">
+      <span>${c.icon}</span>${c.label}
+    </div>`;
+  }).join('');
+}
+
+async function saveEdit(){
+  const amt = parseFloat(document.getElementById('edit-amount').value);
+  if(!amt||amt<=0){ toast('Enter a valid amount'); return; }
+  const dateVal = document.getElementById('edit-date').value;
+  if(!dateVal){ toast('Please select a date'); return; }
+
+  const btn = document.getElementById('edit-save-btn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+
+  const updates = {
+    amount:       amt,
+    payer:        editSelPayer,
+    category:     editSelCat || 'other',
+    notes:        document.getElementById('edit-notes').value.trim(),
+    expense_date: dateVal,
+  };
+
+  const {data:updated, error} = await sbClient
+    .from('expenses')
+    .update(updates)
+    .eq('id', editingId)
+    .select()
+    .single();
+
+  btn.disabled = false; btn.textContent = 'Save Changes';
+
+  if(error){ toast('❌ Update failed: '+error.message); return; }
+
+  // update local state
+  const idx = expenses.findIndex(e=>String(e.id)===String(editingId));
+  if(idx>-1) expenses[idx] = dbToLocal(updated);
+  expenses.sort((a,b)=>new Date(b.expenseDate)-new Date(a.expenseDate));
+
+  closeEditModal();
+  renderAll();
+  toast('✓ Expense updated');
+}
+
+/* ══════════════════════════════════════════
    RENDER
 ══════════════════════════════════════════ */
 function renderAll(){ renderTotals(); renderLedger(); renderAnalysis(); }
@@ -769,9 +940,14 @@ function renderLedger(){
           </div>
         </div>
       </div>
-      <button class="entry-del" onclick="delEntry('${e.id}')" title="Delete">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
-      </button>
+      <div class="entry-actions">
+        <button class="entry-edit" onclick="openEditModal('${e.id}')" title="Edit">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        </button>
+        <button class="entry-del" onclick="delEntry('${e.id}')" title="Delete">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+        </button>
+      </div>
     </div>`;
   }).join('')+'</div>';
 }
@@ -904,8 +1080,8 @@ function toast(msg,dur=2800){
    Once filled in, the setup screen never
    appears on any device ever again.
 ══════════════════════════════════════════ */
-const HARDCODED_URL = "https://sbmodsxvdjzprsxzeopx.supabase.co";  // paste your Project URL here
-const HARDCODED_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNibW9kc3h2ZGp6cHJzeHplb3B4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1NzM0NjgsImV4cCI6MjA5NjE0OTQ2OH0.pzJchVRZ4D4mtRHWdaw1iZnzyBKzAJv1Ukb2jjpVBvg";  // paste your anon key here
+const HARDCODED_URL = "";  // paste your Project URL here
+const HARDCODED_KEY = "";  // paste your anon key here
 
 (function autoLoad(){
   // Priority 1: hardcoded values in the file
