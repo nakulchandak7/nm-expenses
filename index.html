@@ -176,8 +176,8 @@ input[type=date]::-webkit-calendar-picker-indicator{opacity:.5;cursor:pointer}
 .bar-item{display:flex;flex-direction:column;gap:.3rem}
 .bar-meta{display:flex;justify-content:space-between;font-size:.78rem}
 .bar-meta .bl{color:var(--ink);font-weight:500}.bar-meta .br{color:var(--muted)}
-.bar-track{height:.45rem;background:var(--rule);border-radius:99px;overflow:hidden}
-.bar-fill{height:100%;border-radius:99px;transition:width .8s cubic-bezier(.34,1.4,.64,1)}
+.bar-track{height:.6rem;background:var(--rule);border-radius:99px;overflow:hidden}
+.bar-fill{height:100%;border-radius:99px;transition:width .9s cubic-bezier(.34,1.4,.64,1)}
 .donut-row{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
 .donut-box{background:var(--surface);border:1px solid var(--rule);border-radius:var(--r);padding:1.2rem;display:flex;flex-direction:column;align-items:center;gap:.7rem}
 .donut-label{font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
@@ -190,6 +190,71 @@ svg.donut{transform:rotate(-90deg)}
 .insight-val{font-family:'Fraunces',serif;font-size:1.15rem;font-weight:700;letter-spacing:-.02em}
 .insight-sub{font-size:.7rem;color:var(--muted)}
 .no-data{text-align:center;padding:2.5rem 1rem;color:var(--muted);font-family:'Fraunces',serif;font-style:italic}
+
+/* CATEGORY BAR — clickable */
+.cat-bar-row{cursor:pointer;border-radius:.65rem;padding:.65rem .6rem;margin:0 -.6rem;transition:background .18s,box-shadow .18s}
+.cat-bar-row:hover{background:rgba(0,0,0,.035);box-shadow:0 1px 6px rgba(0,0,0,.04)}
+.cat-bar-row.open{background:rgba(0,0,0,.028)}
+.cat-bar-row .bar-meta{margin-bottom:.45rem}
+.cat-chevron{transition:transform .25s;display:inline-block;margin-left:.35rem;opacity:.35;font-size:.6rem}
+.cat-bar-row.open .cat-chevron{transform:rotate(90deg);opacity:.7}
+
+/* CATEGORY DRILL-DOWN PANEL */
+.cat-detail{
+  overflow:hidden;
+  max-height:0;
+  transition:max-height .4s cubic-bezier(.4,0,.2,1), opacity .3s;
+  opacity:0;
+}
+.cat-detail.open{
+  max-height:2000px;
+  opacity:1;
+}
+/* "Show all" toggle inside drill-down */
+.cat-show-more{
+  display:flex;align-items:center;justify-content:center;
+  gap:.4rem;padding:.5rem;border-radius:.4rem;
+  font-size:.75rem;font-weight:600;color:var(--muted);
+  cursor:pointer;border:1px dashed var(--rule);
+  background:transparent;width:100%;
+  transition:background .15s,color .15s;margin-top:.25rem;
+}
+.cat-show-more:hover{background:var(--rule);color:var(--ink)}
+.cat-detail-inner{
+  border-top:1px solid var(--rule);
+  margin-top:.6rem;
+  padding-top:.75rem;
+  display:flex;flex-direction:column;gap:.5rem;
+}
+.cat-stat-row{
+  display:flex;justify-content:space-between;align-items:center;
+  font-size:.8rem;padding:.25rem 0;border-bottom:1px solid var(--rule);
+}
+.cat-stat-row:last-child{border-bottom:none}
+.cat-stat-label{color:var(--muted)}
+.cat-stat-val{font-weight:600;color:var(--ink)}
+.cat-mini-entry{
+  display:flex;justify-content:space-between;align-items:center;
+  font-size:.78rem;padding:.4rem .6rem;background:var(--bg);
+  border-radius:.4rem;gap:.5rem;
+}
+.cat-mini-left{display:flex;flex-direction:column;gap:.1rem;flex:1;min-width:0}
+.cat-mini-note{font-size:.7rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cat-mini-meta{display:flex;gap:.4rem;align-items:center}
+.cat-mini-date{font-size:.68rem;color:var(--muted)}
+.cat-mini-payer{font-size:.65rem;font-weight:600;padding:.1rem .4rem;border-radius:99px}
+.cat-mini-payer.n{background:var(--nakul-bg);color:var(--nakul)}
+.cat-mini-payer.m{background:var(--minal-bg);color:var(--minal)}
+.cat-mini-amt{font-family:'Fraunces',serif;font-weight:700;font-size:.88rem;flex-shrink:0}
+.cat-detail-header{
+  display:flex;justify-content:space-between;align-items:center;
+  margin-bottom:.5rem;font-size:.72rem;font-weight:600;
+  text-transform:uppercase;letter-spacing:.06em;color:var(--muted);
+}
+.cat-split-bar{
+  display:flex;height:.35rem;border-radius:99px;overflow:hidden;gap:1px;margin:.35rem 0 .6rem;
+}
+.cat-split-seg{height:100%;transition:width .5s ease}
 
 /* MODAL */
 .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.4);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;z-index:200;opacity:0;pointer-events:none;transition:opacity .2s}
@@ -962,58 +1027,133 @@ function renderLedger(){
 function renderAnalysis(){
   const wrap=document.getElementById('analysis-wrap');
   if(!wrap) return;
-  // Always clear first — prevents stale category data showing
   wrap.innerHTML='';
   if(!expenses.length){ wrap.innerHTML='<div class="no-data">Add some expenses to see analysis.</div>'; return; }
-  const total=expenses.reduce((s,e)=>s+e.amount,0);
-  const nAmt=expenses.filter(e=>e.payer==='nakul').reduce((s,e)=>s+e.amount,0);
-  const mAmt=total-nAmt;
-  const nPct=total?Math.round(nAmt/total*100):0;
-  const mPct=100-nPct;
+
+  const total  = expenses.reduce((s,e)=>s+e.amount,0);
+  const nAmt   = expenses.filter(e=>e.payer==='nakul').reduce((s,e)=>s+e.amount,0);
+  const mAmt   = total - nAmt;
+  const avg    = total / expenses.length;
+  const biggest= [...expenses].sort((a,b)=>b.amount-a.amount)[0];
+
+  // by category
   const bycat={};
-  CATS.forEach(c=>{bycat[c.id]=0});
-  expenses.forEach(e=>{bycat[e.cat]=(bycat[e.cat]||0)+e.amount});
-  const catSorted=CATS.map(c=>({...c,amt:bycat[c.id]||0})).filter(c=>c.amt>0).sort((a,b)=>b.amt-a.amt);
-  const avg=total/expenses.length;
-  const biggest=[...expenses].sort((a,b)=>b.amount-a.amount)[0];
-  const topCat=catSorted[0];
+  CATS.forEach(c=>{ bycat[c.id]=0; });
+  expenses.forEach(e=>{ bycat[e.cat]=(bycat[e.cat]||0)+e.amount; });
+  const catSorted = CATS
+    .map(c=>({...c, amt: bycat[c.id]||0}))
+    .filter(c=>c.amt>0)
+    .sort((a,b)=>b.amt-a.amt);
+  const topCat = catSorted[0];
+
+  // monthly
   const monthly={};
   expenses.forEach(e=>{
-    const d=e.expenseDate?new Date(e.expenseDate+'T00:00:00'):new Date(e.date);
-    const k=d.toLocaleDateString('en-IN',{month:'short',year:'numeric'});
+    const d = e.expenseDate ? new Date(e.expenseDate+'T00:00:00') : new Date(e.date);
+    const k = d.toLocaleDateString('en-IN',{month:'short',year:'numeric'});
     monthly[k]=(monthly[k]||0)+e.amount;
   });
-  const months=Object.entries(monthly).slice(-5).reverse();
-  const maxM=Math.max(...months.map(m=>m[1]));
+  const months = Object.entries(monthly).slice(-5).reverse();
+  const maxM   = Math.max(...months.map(m=>m[1]));
+
+  // ── build category rows HTML ──
+  const catRowsHTML = catSorted.map(c=>{
+    const pct     = Math.round(c.amt/total*100);
+    const catExp  = expenses.filter(e=>String(e.cat)===String(c.id));
+
+
+    // last 3 entries for this category
+    const sortedExp = [...catExp]
+      .sort((a,b)=>new Date(b.expenseDate||b.date)-new Date(a.expenseDate||a.date));
+    const previewExp = sortedExp.slice(0,4);
+    const remainExp  = sortedExp.slice(4);
+
+    const makeMiniEntry = e=>{
+      const d = e.expenseDate
+        ? new Date(e.expenseDate+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'})
+        : new Date(e.date).toLocaleDateString('en-IN',{day:'numeric',month:'short'});
+      return `<div class="cat-mini-entry">
+        <div class="cat-mini-left">
+          ${e.notes?`<div class="cat-mini-note">${esc(e.notes)}</div>`:`<div class="cat-mini-note" style="font-style:italic;opacity:.5">No notes</div>`}
+          <div class="cat-mini-meta">
+            <span class="cat-mini-payer ${e.payer==='nakul'?'n':'m'}">${e.payer==='nakul'?'Nakul':'Minal'}</span>
+            <span class="cat-mini-date">${d}</span>
+          </div>
+        </div>
+        <div class="cat-mini-amt" style="color:${c.color}">${fmt(e.amount)}</div>
+      </div>`;
+    };
+
+    const previewHTML  = previewExp.map(makeMiniEntry).join('');
+    const remainHTML   = remainExp.length
+      ? `<div id="cat-more-${c.id}" style="display:none">${remainExp.map(makeMiniEntry).join('')}</div>
+         <button class="cat-show-more" onclick="event.stopPropagation();toggleCatMore('${c.id}',${remainExp.length})" id="cat-show-btn-${c.id}">
+           ▾ Show ${remainExp.length} more entr${remainExp.length===1?'y':'ies'}
+         </button>`
+      : '';
+
+    return `<div class="cat-bar-row" id="cbr-${c.id}" onclick="toggleCatDetail('${c.id}')">
+      <div class="bar-meta">
+        <span class="bl" style="display:flex;align-items:center;gap:.4rem">
+          <span style="font-size:1rem">${c.icon}</span>
+          <span style="font-weight:600;color:var(--ink)">${c.label}</span>
+          <span class="cat-chevron">▶</span>
+        </span>
+        <span class="br" style="display:flex;flex-direction:column;align-items:flex-end;gap:.05rem">
+          <span style="font-family:'Fraunces',serif;font-weight:700;font-size:.95rem;color:${c.color}">${fmt(c.amt)}</span>
+          <span style="font-size:.68rem;color:var(--muted)">${pct}% · ${catExp.length} entr${catExp.length===1?'y':'ies'}</span>
+        </span>
+      </div>
+      <div class="bar-track">
+        <div class="bar-fill" style="width:${pct}%;background:${c.color}"></div>
+      </div>
+
+      <div class="cat-detail" id="cd-${c.id}">
+        <div class="cat-detail-inner">
+          <div class="cat-detail-header">
+            <span>Summary</span>
+            <span>${catExp.length} expense${catExp.length===1?'':'s'}</span>
+          </div>
+
+          <div class="cat-detail-header" style="margin-top:.1rem">
+            <span>Entries</span>
+            <span>${sortedExp.length} total</span>
+          </div>
+          ${previewHTML}${remainHTML}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
 
   wrap.innerHTML=`
   <div class="card" style="margin-bottom:1rem">
     <div class="card-title">At a Glance</div>
     <div class="insight-grid">
-      <div class="insight-card"><div class="insight-lbl">Avg Entry</div><div class="insight-val">${fmt(avg)}</div><div class="insight-sub">${expenses.length} total</div></div>
-      <div class="insight-card"><div class="insight-lbl">Biggest</div><div class="insight-val">${fmt(biggest.amount)}</div><div class="insight-sub">${(CATS.find(c=>c.id===biggest.cat)||CATS.find(x=>x.id==='other')).label}</div></div>
-      <div class="insight-card"><div class="insight-lbl">Top Category</div><div class="insight-val">${topCat?(CATS.find(c=>c.id===topCat.id)||CATS.find(x=>x.id==='other')).icon+' '+topCat.label:'—'}</div><div class="insight-sub">${topCat?fmt(topCat.amt):''}</div></div>
+      <div class="insight-card">
+        <div class="insight-lbl">Total Spent</div>
+        <div class="insight-val">${fmt(total)}</div>
+        <div class="insight-sub">${expenses.length} entries</div>
+      </div>
+      <div class="insight-card">
+        <div class="insight-lbl">Avg Entry</div>
+        <div class="insight-val">${fmt(avg)}</div>
+        <div class="insight-sub">per expense</div>
+      </div>
+      <div class="insight-card">
+        <div class="insight-lbl">Biggest</div>
+        <div class="insight-val">${fmt(biggest.amount)}</div>
+        <div class="insight-sub">${(CATS.find(c=>c.id===biggest.cat)||CATS.find(x=>x.id==='other')).label}</div>
+      </div>
     </div>
   </div>
+
   <div class="card" style="margin-bottom:1rem">
-    <div class="card-title">Who Paid More</div>
-    <div class="donut-row">
-      <div class="donut-box"><div class="donut-label" style="color:var(--nakul)">Nakul</div>${donutSVG(nPct,'var(--nakul)')}<div style="font-size:.78rem;color:var(--muted)">${fmt(nAmt)}</div></div>
-      <div class="donut-box"><div class="donut-label" style="color:var(--minal)">Minal</div>${donutSVG(mPct,'var(--minal)')}<div style="font-size:.78rem;color:var(--muted)">${fmt(mAmt)}</div></div>
+    <div class="card-title" style="margin-bottom:1.1rem">Spend by Category
+      <span style="font-size:.72rem;font-weight:400;color:var(--muted);margin-left:.5rem">tap to expand</span>
     </div>
-    ${nAmt!==mAmt
-      ?`<div style="margin-top:1rem;padding:.85rem;background:var(--green-bg);border:1px solid rgba(45,122,82,.2);border-radius:.55rem;font-size:.82rem;color:var(--green);font-weight:500;">💡 ${nAmt>mAmt?'Nakul':'Minal'} has paid ${fmt(Math.abs(nAmt-mAmt))} more. Balance owed by ${nAmt>mAmt?'Minal':'Nakul'}: ${fmt(Math.abs(nAmt-mAmt)/2)}.</div>`
-      :`<div style="margin-top:1rem;padding:.85rem;background:var(--green-bg);border:1px solid rgba(45,122,82,.2);border-radius:.55rem;font-size:.82rem;color:var(--green);font-weight:500;">✓ Perfect split — all even!</div>`}
+    <div style="display:flex;flex-direction:column;gap:.15rem">${catRowsHTML}</div>
   </div>
-  <div class="card" style="margin-bottom:1rem">
-    <div class="card-title">Spend by Category</div>
-    <div class="bar-list">${catSorted.map(c=>`
-      <div class="bar-item">
-        <div class="bar-meta"><span class="bl">${c.icon} ${c.label}</span><span class="br">${fmt(c.amt)} · ${Math.round(c.amt/total*100)}%</span></div>
-        <div class="bar-track"><div class="bar-fill" style="width:${Math.round(c.amt/total*100)}%;background:${c.color}"></div></div>
-      </div>`).join('')}
-    </div>
-  </div>
+
   ${months.length>1?`<div class="card">
     <div class="card-title">Monthly Breakdown</div>
     <div class="bar-list">${months.map(([mo,amt])=>`
@@ -1024,6 +1164,7 @@ function renderAnalysis(){
     </div>
   </div>`:''}`;
 
+  // animate bars
   setTimeout(()=>{
     document.querySelectorAll('#analysis-wrap .bar-fill').forEach(el=>{
       const w=el.style.width; el.style.width='0'; requestAnimationFrame(()=>el.style.width=w);
@@ -1031,9 +1172,55 @@ function renderAnalysis(){
   },50);
 }
 
-function donutSVG(pct,color){
-  const r=34,cx=42,cy=42,circ=2*Math.PI*r,dash=circ*pct/100,gap=circ-dash;
-  return`<div class="donut-center"><svg class="donut" width="84" height="84" viewBox="0 0 84 84"><circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--rule)" stroke-width="8"/><circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${color}" stroke-width="8" stroke-dasharray="${dash} ${gap}" stroke-linecap="round"/></svg><div class="donut-pct">${pct}%</div></div>`;
+/* ══════════════════════════════════════════
+   CATEGORY DRILL-DOWN TOGGLE
+══════════════════════════════════════════ */
+let openCatId = null;
+
+function toggleCatMore(id, count){
+  const moreEl  = document.getElementById('cat-more-'+id);
+  const btnEl   = document.getElementById('cat-show-btn-'+id);
+  if(!moreEl || !btnEl) return;
+  const showing = moreEl.style.display !== 'none';
+  moreEl.style.display = showing ? 'none' : 'block';
+  btnEl.textContent = showing
+    ? '▾ Show '+count+' more entr'+(count===1?'y':'ies')
+    : '▴ Collapse';
+}
+
+function toggleCatDetail(id){
+  const row    = document.getElementById('cbr-'+id);
+  const detail = document.getElementById('cd-'+id);
+  if(!row||!detail) return;
+
+  const isOpen = detail.classList.contains('open');
+
+  // close any currently open one
+  if(openCatId && openCatId!==id){
+    const prevRow    = document.getElementById('cbr-'+openCatId);
+    const prevDetail = document.getElementById('cd-'+openCatId);
+    if(prevRow)    prevRow.classList.remove('open');
+    if(prevDetail) prevDetail.classList.remove('open');
+  }
+
+  if(isOpen){
+    row.classList.remove('open');
+    detail.classList.remove('open');
+    openCatId = null;
+  } else {
+    row.classList.add('open');
+    detail.classList.add('open');
+    openCatId = id;
+    // Animate the split bar segments
+    setTimeout(()=>{
+      detail.querySelectorAll('.cat-split-seg').forEach(seg=>{
+        const w=seg.style.width; seg.style.width='0';
+        requestAnimationFrame(()=>seg.style.width=w);
+      });
+    },30);
+    // Scroll into view smoothly
+    setTimeout(()=>row.scrollIntoView({behavior:'smooth',block:'nearest'}),50);
+  }
 }
 
 /* ══════════════════════════════════════════
