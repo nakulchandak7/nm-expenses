@@ -569,11 +569,12 @@ function subscribeRealtime(){
         const updated = dbToLocal(payload.new);
         const idx = expenses.findIndex(e=>String(e.id)===String(updated.id));
         if(idx>-1){
-          // Don't overwrite if this device just saved it (already updated locally)
+          const wasOwnEdit = String(editingId)===String(updated.id) || (expenses[idx].cat===updated.cat && expenses[idx].amount===updated.amount && expenses[idx].payer===updated.payer);
           expenses[idx] = updated;
           expenses.sort((a,b)=>new Date(b.expenseDate)-new Date(a.expenseDate));
           renderAll();
-          toast('✦ Expense updated');
+          // Only toast on the OTHER user's device
+          if(!wasOwnEdit) toast('✦ Expense updated');
         }
       }
     )
@@ -895,6 +896,7 @@ async function saveEdit(){
   expenses.sort((a,b)=>new Date(b.expenseDate)-new Date(a.expenseDate));
 
   closeEditModal();
+  // Force full re-render — critical so analysis picks up category/payer changes
   renderAll();
   toast('✓ Expense updated');
 }
@@ -902,7 +904,12 @@ async function saveEdit(){
 /* ══════════════════════════════════════════
    RENDER
 ══════════════════════════════════════════ */
-function renderAll(){ renderTotals(); renderLedger(); renderAnalysis(); }
+function renderAll(){
+  renderTotals();
+  renderLedger();
+  // Always recompute analysis so it's fresh whenever the tab is opened
+  renderAnalysis();
+}
 
 function renderTotals(){
   const nAmt=expenses.filter(e=>e.payer==='nakul').reduce((s,e)=>s+e.amount,0);
@@ -954,6 +961,9 @@ function renderLedger(){
 
 function renderAnalysis(){
   const wrap=document.getElementById('analysis-wrap');
+  if(!wrap) return;
+  // Always clear first — prevents stale category data showing
+  wrap.innerHTML='';
   if(!expenses.length){ wrap.innerHTML='<div class="no-data">Add some expenses to see analysis.</div>'; return; }
   const total=expenses.reduce((s,e)=>s+e.amount,0);
   const nAmt=expenses.filter(e=>e.payer==='nakul').reduce((s,e)=>s+e.amount,0);
@@ -1060,7 +1070,9 @@ function switchTab(id,btn){
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('tab-'+id).classList.add('active');
   btn.classList.add('active');
+  // Always re-render from live data when switching tabs
   if(id==='analysis') renderAnalysis();
+  if(id==='history')  renderLedger();
 }
 
 /* ══════════════════════════════════════════
