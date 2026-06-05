@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>N & M · Expenses</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,500;0,9..144,700;1,9..144,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -15,7 +15,7 @@
   --green:#2d7a52;--green-bg:#edf7f2;--amber:#b8860b;--r:0.75rem;
   -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility;
 }
-html{font-size:clamp(14px,1.1vw,16px)}
+html{font-size:16px}
 body{background:var(--bg);font-family:'DM Sans',sans-serif;color:var(--ink);min-height:100vh;opacity:0;animation:fadeUp .6s ease forwards}
 @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
 
@@ -42,6 +42,7 @@ body{background:var(--bg);font-family:'DM Sans',sans-serif;color:var(--ink);min-
   font-family:'DM Mono',monospace;font-size:.82rem;background:var(--bg);
   border:1.5px solid var(--rule);border-radius:.5rem;color:var(--ink);
   padding:.6rem .8rem;width:100%;outline:none;transition:border-color .2s;
+  font-size:16px;
 }
 .step-input:focus{border-color:#bbb}
 .step-hint{font-size:.7rem;color:var(--muted);margin-top:.3rem}
@@ -106,7 +107,7 @@ body{background:var(--bg);font-family:'DM Sans',sans-serif;color:var(--ink);min-
 .field:last-child{margin-bottom:0}
 label{font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
 input[type=number],input[type=text],input[type=date],textarea,select{
-  font-family:'DM Sans',sans-serif;font-size:.95rem;background:var(--bg);
+  font-family:'DM Sans',sans-serif;font-size:16px;background:var(--bg);
   border:1.5px solid var(--rule);border-radius:.55rem;color:var(--ink);
   padding:.65rem .9rem;width:100%;outline:none;transition:border-color .2s,box-shadow .2s;
 }
@@ -119,7 +120,7 @@ input[type=date]::-webkit-calendar-picker-indicator{opacity:.5;cursor:pointer}
 /* AMOUNT INPUT */
 .amount-wrap{position:relative}
 .amount-prefix{position:absolute;left:.9rem;top:50%;transform:translateY(-50%);font-family:'Fraunces',serif;font-size:1.2rem;color:var(--muted);pointer-events:none}
-.amount-wrap input{padding-left:2rem;font-family:'Fraunces',serif;font-size:1.5rem;font-weight:700;letter-spacing:-.02em}
+.amount-wrap input{padding-left:2rem;font-family:'Fraunces',serif;font-size:clamp(16px,1.5rem,1.5rem);font-weight:700;letter-spacing:-.02em}
 
 /* PAID BY */
 .paid-toggle{display:grid;grid-template-columns:1fr 1fr;gap:.5rem}
@@ -589,10 +590,14 @@ function setStatus(state, text){
 function renderCats(){
   const g = document.getElementById('cat-grid');
   if(!g) return;
+  // Normalize all IDs to strings for reliable comparison
+  const currentSel = String(selCat);
   g.innerHTML = CATS.map(c=>{
-    const isCustom = customCats.find(x=>x.id===c.id);
-    return`<div class="cat-pill${selCat===c.id?' active':''}" onclick="selectCat('${c.id}')">
-      <span>${c.icon}</span>${c.label}${isCustom?`<span class="cat-del-btn" onclick="event.stopPropagation();delCustomCat('${c.id}')" title="Remove">✕</span>`:''}
+    const cid = String(c.id);
+    const isCustom = customCats.find(x=>String(x.id)===cid);
+    const isActive = currentSel && currentSel===cid;
+    return`<div class="cat-pill${isActive?' active':''}" onclick="selectCat('${cid}')">
+      <span>${c.icon}</span>${c.label}${isCustom?`<span class="cat-del-btn" onclick="event.stopPropagation();delCustomCat('${cid}')" title="Remove">✕</span>`:''}
     </div>`;
   }).join('')+
   `<div class="cat-pill add-pill" onclick="openCatModal()">
@@ -601,7 +606,11 @@ function renderCats(){
   </div>`;
 }
 
-function selectCat(id){ selCat = selCat===id?'':id; renderCats(); }
+function selectCat(id){
+  const sid = String(id);
+  selCat = String(selCat)===sid ? '' : sid;
+  renderCats();
+}
 function selectPayer(p){
   selPayer=p;
   document.getElementById('opt-nakul').className='paid-opt'+(p==='nakul'?' sel-n':'');
@@ -641,7 +650,7 @@ async function saveCustomCat(){
   }
   selCat = String(inserted.id);
   renderCats();
-  toast('✓ Category added — visible to both users');
+  toast('✓ Category added');
 }
 
 async function delCustomCat(id){
@@ -895,8 +904,8 @@ function toast(msg,dur=2800){
    Once filled in, the setup screen never
    appears on any device ever again.
 ══════════════════════════════════════════ */
-const HARDCODED_URL = "";  // paste your Project URL here
-const HARDCODED_KEY = "";  // paste your anon key here
+const HARDCODED_URL = "https://sbmodsxvdjzprsxzeopx.supabase.co";  // paste your Project URL here
+const HARDCODED_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNibW9kc3h2ZGp6cHJzeHplb3B4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1NzM0NjgsImV4cCI6MjA5NjE0OTQ2OH0.pzJchVRZ4D4mtRHWdaw1iZnzyBKzAJv1Ukb2jjpVBvg";  // paste your anon key here
 
 (function autoLoad(){
   // Priority 1: hardcoded values in the file
