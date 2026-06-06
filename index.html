@@ -76,7 +76,7 @@ body{background:var(--bg);font-family:'DM Sans',sans-serif;color:var(--ink);min-
 .brand-sub{font-size:.78rem;color:var(--muted);margin-top:.25rem;letter-spacing:.04em;text-transform:uppercase}
 .grand-total-chip{text-align:right}
 .chip-label{font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
-.chip-val{font-family:'Fraunces',serif;font-size:1.6rem;font-weight:700;color:var(--ink);letter-spacing:-.03em;line-height:1.1}
+.chip-val{font-family:'Fraunces',serif;font-size:1.6rem;font-weight:700;color:var(--ink);letter-spacing:-.03em;line-height:1.1;font-variant-numeric:tabular-nums}
 
 /* ── SPLIT TOTALS ── */
 .split-row{display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-bottom:.75rem;animation:fadeUp .5s ease .2s both}
@@ -125,8 +125,8 @@ input[type=date]::-webkit-calendar-picker-indicator{opacity:.5;cursor:pointer}
 
 /* AMOUNT INPUT */
 .amount-wrap{position:relative}
-.amount-prefix{position:absolute;left:.9rem;top:50%;transform:translateY(-50%);font-family:'Fraunces',serif;font-size:1.2rem;color:var(--muted);pointer-events:none}
-.amount-wrap input{padding-left:2rem;font-family:'Fraunces',serif;font-size:clamp(16px,1.4rem,1.4rem);font-weight:700;letter-spacing:-.02em}
+.amount-prefix{position:absolute;left:.85rem;top:50%;transform:translateY(-50%);font-family:'Fraunces',serif;font-size:1.2rem;color:var(--muted);pointer-events:none;letter-spacing:.08em}
+.amount-wrap input{padding-left:2.75rem;font-family:'Fraunces',serif;font-size:clamp(16px,1.4rem,1.4rem);font-weight:700;letter-spacing:-.02em}
 
 /* PAID BY */
 .paid-toggle{display:grid;grid-template-columns:1fr 1fr;gap:.5rem}
@@ -169,6 +169,7 @@ input[type=date]::-webkit-calendar-picker-indicator{opacity:.5;cursor:pointer}
 .entry-body{flex:1;min-width:0}
 .entry-top{display:flex;justify-content:space-between;align-items:center}
 .entry-cat{font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.amt-symbol{letter-spacing:.05em}
 .entry-amt{font-family:'Fraunces',serif;font-size:1.1rem;font-weight:700}
 .entry-note{font-size:.82rem;color:var(--muted);margin-top:.15rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .entry-footer{display:flex;justify-content:space-between;align-items:center;margin-top:.4rem}
@@ -270,8 +271,8 @@ svg.donut{transform:rotate(-90deg)}
 
 /* EDIT MODAL specifics */
 .edit-amount-wrap{position:relative}
-.edit-amount-prefix{position:absolute;left:.9rem;top:50%;transform:translateY(-50%);font-family:'Fraunces',serif;font-size:1.1rem;color:var(--muted);pointer-events:none}
-.edit-amount-wrap input{padding-left:2rem;font-family:'Fraunces',serif;font-size:clamp(16px,1.4rem,1.4rem);font-weight:700;letter-spacing:-.02em}
+.edit-amount-prefix{position:absolute;left:.9rem;top:50%;transform:translateY(-50%);font-family:'Fraunces',serif;font-size:1.1rem;color:var(--muted);pointer-events:none;letter-spacing:.08em}
+.edit-amount-wrap input{padding-left:2.75rem;font-family:'Fraunces',serif;font-size:clamp(16px,1.4rem,1.4rem);font-weight:700;letter-spacing:-.02em}
 .edit-paid-toggle{display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-bottom:0}
 .edit-cat-grid{display:flex;flex-wrap:wrap;gap:.45rem}
 
@@ -338,7 +339,7 @@ svg.donut{transform:rotate(-90deg)}
     </div>
     <div class="grand-total-chip">
       <div class="chip-label">Total Spent</div>
-      <div class="chip-val" id="grandTotal">₹0</div>
+      <div class="chip-val" id="grandTotal">₹ 0</div>
     </div>
   </div>
 
@@ -353,11 +354,11 @@ svg.donut{transform:rotate(-90deg)}
   <div class="split-row">
     <div class="split-card n">
       <div class="split-name">Nakul</div>
-      <div class="split-amt" id="totalNakul">₹0</div>
+      <div class="split-amt" id="totalNakul">₹ 0</div>
     </div>
     <div class="split-card m">
       <div class="split-name">Minal</div>
-      <div class="split-amt" id="totalMinal">₹0</div>
+      <div class="split-amt" id="totalMinal">₹ 0</div>
     </div>
   </div>
 
@@ -375,7 +376,7 @@ svg.donut{transform:rotate(-90deg)}
         <label>Amount</label>
         <div class="amount-wrap">
           <span class="amount-prefix">₹</span>
-          <input type="number" id="inp-amount" placeholder="0.00" min="0" step="0.01">
+          <input type="number" id="inp-amount" placeholder="0" min="0" step="1" inputmode="numeric" pattern="[0-9]*">
         </div>
       </div>
       <div class="field">
@@ -440,7 +441,7 @@ svg.donut{transform:rotate(-90deg)}
       <label>Amount</label>
       <div class="edit-amount-wrap">
         <span class="edit-amount-prefix">₹</span>
-        <input type="number" id="edit-amount" placeholder="0.00" min="0" step="0.01">
+        <input type="number" id="edit-amount" placeholder="0" min="0" step="1" inputmode="numeric" pattern="[0-9]*">
       </div>
     </div>
 
@@ -811,7 +812,7 @@ async function delCustomCat(id){
    ADD EXPENSE
 ══════════════════════════════════════════ */
 async function addExpense(){
-  const amt = parseFloat(document.getElementById('inp-amount').value);
+  const amt = Math.round(parseFloat(document.getElementById('inp-amount').value));
   if(!amt||amt<=0){toast('Enter a valid amount');return;}
   const dateVal = document.getElementById('inp-date').value;
   if(!dateVal){toast('Please select a date');return;}
@@ -933,7 +934,7 @@ function renderEditCats(){
 }
 
 async function saveEdit(){
-  const amt = parseFloat(document.getElementById('edit-amount').value);
+  const amt = Math.round(parseFloat(document.getElementById('edit-amount').value));
   if(!amt||amt<=0){ toast('Enter a valid amount'); return; }
   const dateVal = document.getElementById('edit-date').value;
   if(!dateVal){ toast('Please select a date'); return; }
@@ -1240,11 +1241,11 @@ function exportExcel(){
       const cat=CATS.find(x=>x.id===e.cat)||CATS.find(x=>x.id==='other');
       const expDate=e.expenseDate?new Date(e.expenseDate+'T00:00:00').toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}):new Date(e.date).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
       const addedOn=new Date(e.date).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
-      rows.push([expDate,e.amount,e.payer==='nakul'?'Nakul':'Minal',cat?cat.label:'Other',e.notes||'',addedOn]);
+      rows.push([expDate,Math.round(e.amount),e.payer==='nakul'?'Nakul':'Minal',cat?cat.label:'Other',e.notes||'',addedOn]); // no ₹ symbol in Excel
     });
   const nAmt=expenses.filter(e=>e.payer==='nakul').reduce((s,e)=>s+e.amount,0);
   const mAmt=expenses.filter(e=>e.payer==='minal').reduce((s,e)=>s+e.amount,0);
-  rows.push([],[' SUMMARY','','','','',''],['Total Expenses',nAmt+mAmt,'','','',''],['Nakul Total',nAmt,'','','',''],['Minal Total',mAmt,'','','',''],['Balance (Nakul owes Minal)',nAmt>mAmt?0:(mAmt-nAmt)/2,'','','',''],['Balance (Minal owes Nakul)',mAmt>nAmt?0:(nAmt-mAmt)/2,'','','','']);
+  rows.push([],[' SUMMARY','','','','',''],['Total Expenses',Math.round(nAmt+mAmt),'','','',''],['Nakul Total',Math.round(nAmt),'','','',''],['Minal Total',Math.round(mAmt),'','','',''],['Balance (Nakul owes Minal)',nAmt>mAmt?0:Math.round((mAmt-nAmt)/2),'','','',''],['Balance (Minal owes Nakul)',mAmt>nAmt?0:Math.round((nAmt-mAmt)/2),'','','','']);
   const csv=rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\r\n');
   const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
   const url=URL.createObjectURL(blob);
@@ -1270,7 +1271,7 @@ function switchTab(id,btn){
 /* ══════════════════════════════════════════
    UTILS
 ══════════════════════════════════════════ */
-function fmt(n){ return '₹'+Number(n).toLocaleString('en-IN',{minimumFractionDigits:0,maximumFractionDigits:2}); }
+function fmt(n){ return '₹ '+Math.round(Number(n)).toLocaleString('en-IN',{minimumFractionDigits:0,maximumFractionDigits:0}); }
 function esc(s){ const d=document.createElement('div');d.textContent=s;return d.innerHTML; }
 function toast(msg,dur=2800){
   const t=document.getElementById('toast');
