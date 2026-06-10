@@ -144,9 +144,9 @@ input[type=date]::-webkit-calendar-picker-indicator{opacity:.5;cursor:pointer}
 .cat-pill.active{background:var(--ink);color:#fff;border-color:var(--ink)}
 .cat-pill.add-pill{border-style:dashed;color:var(--muted);background:transparent}
 .cat-pill.add-pill:hover{border-color:var(--ink);color:var(--ink);background:transparent}
-.cat-del-btn{display:inline-flex;align-items:center;justify-content:center;margin-left:.2rem;width:1.1rem;height:1.1rem;border-radius:50%;background:rgba(0,0,0,0);font-size:.65rem;cursor:pointer;opacity:0;transition:opacity .15s,background .15s;color:inherit;flex-shrink:0}
-.cat-pill:hover .cat-del-btn{opacity:.6}
-.cat-del-btn:hover{opacity:1!important;background:rgba(0,0,0,.12)}
+.cat-del-btn{display:inline-flex;align-items:center;justify-content:center;margin-left:.25rem;width:1.3rem;height:1.3rem;border-radius:50%;background:rgba(0,0,0,0);font-size:.65rem;cursor:pointer;opacity:0;transition:opacity .2s .3s,background .15s;color:inherit;flex-shrink:0;-webkit-tap-highlight-color:transparent}
+.cat-pill:hover .cat-del-btn{opacity:.55;transition:opacity .2s .4s,background .15s}
+.cat-del-btn:hover,.cat-del-btn:active{opacity:1!important;background:rgba(180,40,40,.15);color:#c0392b}
 
 /* SUBMIT BTN */
 .submit-btn{width:100%;margin-top:.75rem;font-family:'DM Sans',sans-serif;font-size:.9rem;font-weight:600;padding:.75rem;border-radius:.6rem;border:none;background:var(--ink);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:.5rem;transition:background .2s,transform .15s,box-shadow .2s}
@@ -741,8 +741,16 @@ function renderCats(){
     const cid = String(c.id);
     const isCustom = customCats.find(x=>String(x.id)===cid);
     const isActive = currentSel && currentSel===cid;
+    if(isCustom){
+      return`<div style="display:inline-flex;align-items:center;gap:.2rem;position:relative">
+        <div class="cat-pill${isActive?' active':''}" onclick="selectCat('${cid}')" style="padding-right:.6rem">
+          <span>${c.icon}</span>${c.label}
+        </div>
+        <button class="cat-del-btn" onclick="delCustomCat('${cid}')" title="Delete category">✕</button>
+      </div>`;
+    }
     return`<div class="cat-pill${isActive?' active':''}" onclick="selectCat('${cid}')">
-      <span>${c.icon}</span>${c.label}${isCustom?`<span class="cat-del-btn" onclick="event.stopPropagation();delCustomCat('${cid}')" title="Remove">✕</span>`:''}
+      <span>${c.icon}</span>${c.label}
     </div>`;
   }).join('')+
   `<div class="cat-pill add-pill" onclick="openCatModal()">
@@ -774,6 +782,21 @@ document.getElementById('catModal').addEventListener('click',e=>{ if(e.target===
 async function saveCustomCat(){
   const label = document.getElementById('newCatLabel').value.trim();
   if(!label){toast('Enter a category name');return;}
+
+  // ── Duplicate check: case-insensitive match across default + custom cats
+  const labelLower = label.toLowerCase();
+  const existsDefault = DEFAULT_CATS.find(c=>c.label.toLowerCase()===labelLower);
+  const existsCustom  = customCats.find(c=>c.label.toLowerCase()===labelLower);
+  if(existsDefault || existsCustom){
+    const existing = existsDefault || existsCustom;
+    // Just select the existing one instead of creating a duplicate
+    selCat = String(existing.id);
+    renderCats();
+    closeCatModal();
+    toast('Category "'+existing.label+'" already exists — selected it');
+    return;
+  }
+
   const icon  = document.getElementById('newCatIcon').value.trim()||'🏷️';
   const colors= ['#6366f1','#ec4899','#14b8a6','#f97316','#84cc16','#a78bfa','#fb7185','#38bdf8'];
   const color = colors[customCats.length % colors.length];
@@ -789,23 +812,34 @@ async function saveCustomCat(){
   if(error){ toast('❌ Could not save category'); return; }
 
   // add locally (realtime will also fire but we dedup)
-  if(!customCats.find(c=>c.id===String(inserted.id))){
+  if(!customCats.find(c=>String(c.id)===String(inserted.id))){
     customCats.push(inserted);
     CATS = [...DEFAULT_CATS,...customCats];
   }
   selCat = String(inserted.id);
   renderCats();
-  toast('✓ Category added');
+  toast('✓ Category "'+label+'" added');
 }
 
 async function delCustomCat(id){
+  const cat = customCats.find(c=>String(c.id)===String(id));
+  const name = cat ? cat.label : 'this category';
+
+  // Check if any expenses use this category
+  const inUse = expenses.filter(e=>String(e.cat)===String(id)).length;
+  const inUseMsg = inUse > 0
+    ? `\n\n⚠️ ${inUse} expense${inUse>1?'s are':' is'} using it — they will show as "Other".`
+    : '';
+
+  if(!confirm(`Delete category "${name}"?${inUseMsg}`)) return;
+
   const {error} = await sbClient.from('custom_cats').delete().eq('id', id);
   if(error){ toast('❌ Could not delete category'); return; }
   customCats = customCats.filter(c=>String(c.id)!==String(id));
   CATS = [...DEFAULT_CATS,...customCats];
   if(selCat===String(id)) selCat='';
   renderCats();
-  toast('Category removed');
+  toast('Category "'+name+'" removed');
 }
 
 /* ══════════════════════════════════════════
