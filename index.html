@@ -144,7 +144,19 @@ input[type=date]::-webkit-calendar-picker-indicator{opacity:.5;cursor:pointer}
 .cat-pill.active{background:var(--ink);color:#fff;border-color:var(--ink)}
 .cat-pill.add-pill{border-style:dashed;color:var(--muted);background:transparent}
 .cat-pill.add-pill:hover{border-color:var(--ink);color:var(--ink);background:transparent}
-.cat-del-btn{display:inline-flex;align-items:center;justify-content:center;margin-left:.25rem;width:1.3rem;height:1.3rem;border-radius:50%;background:rgba(0,0,0,0);font-size:.65rem;cursor:pointer;opacity:0;transition:opacity .2s .3s,background .15s;color:inherit;flex-shrink:0;-webkit-tap-highlight-color:transparent}
+.cat-del-btn{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:1.5rem;height:1.5rem;border-radius:50%;
+  background:rgba(200,50,50,.13);
+  border:1.5px solid rgba(200,50,50,.3);
+  font-size:.62rem;cursor:pointer;
+  color:#c0392b;flex-shrink:0;
+  opacity:1;
+  transition:background .15s,transform .12s;
+  -webkit-tap-highlight-color:transparent;
+  padding:0;line-height:1;
+}
+.cat-del-btn:hover,.cat-del-btn:active{background:rgba(200,50,50,.28);transform:scale(1.1)}
 .cat-pill:hover .cat-del-btn{opacity:.55;transition:opacity .2s .4s,background .15s}
 .cat-del-btn:hover,.cat-del-btn:active{opacity:1!important;background:rgba(180,40,40,.15);color:#c0392b}
 
