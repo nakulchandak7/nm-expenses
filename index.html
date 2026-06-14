@@ -394,51 +394,51 @@ input[type=date]::-webkit-calendar-picker-indicator{opacity:.5;cursor:pointer}
     <div id="analysis-wrap"><div class="no-data">Add some expenses to see analysis.</div></div>
   </div>
 
+  <!-- EDIT PANEL — opens like a page, not an overlay -->
+  <div class="panel" id="tab-edit">
+    <div class="card">
+      <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:1rem">
+        <button onclick="closeEditModal()" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:1.4rem;padding:0;line-height:1;display:flex;align-items:center">‹</button>
+        <div class="card-title" style="margin:0">Edit Expense</div>
+      </div>
+      <div class="field">
+        <label>Amount</label>
+        <div class="edit-amount-wrap">
+          <span class="edit-amount-prefix">₹</span>
+          <input type="number" id="edit-amount" placeholder="0" min="0" step="1" inputmode="numeric" pattern="[0-9]*">
+        </div>
+      </div>
+      <div class="field">
+        <label>Date of Expense</label>
+        <input type="date" id="edit-date">
+      </div>
+      <div class="field">
+        <label>Paid by</label>
+        <div class="edit-paid-toggle">
+          <div class="paid-opt" id="edit-opt-nakul" onclick="editSelectPayer('nakul')">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>Nakul
+          </div>
+          <div class="paid-opt" id="edit-opt-minal" onclick="editSelectPayer('minal')">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>Minal
+          </div>
+        </div>
+      </div>
+      <div class="field">
+        <label>Category</label>
+        <div class="edit-cat-grid" id="edit-cat-grid"></div>
+      </div>
+      <div class="field">
+        <label>Notes</label>
+        <textarea id="edit-notes" placeholder="What was this for? (optional)" style="min-height:4rem"></textarea>
+      </div>
+      <button class="submit-btn" id="edit-save-btn" onclick="saveEdit()">Save Changes</button>
+      <button onclick="closeEditModal()" style="width:100%;margin-top:.5rem;background:none;border:none;color:var(--muted);font-size:.85rem;font-weight:600;padding:.6rem;cursor:pointer">Cancel</button>
+    </div>
+  </div>
 
 </div>
 
 <div id="toast"></div>
-
-<!-- EDIT MODAL -->
-<div class="modal-bg" id="editModal">
-  <div class="modal">
-    <div class="modal-title">Edit Expense</div>
-    <div class="field">
-      <label>Amount</label>
-      <div class="edit-amount-wrap">
-        <span class="edit-amount-prefix">₹</span>
-        <input type="number" id="edit-amount" placeholder="0" min="0" step="1" inputmode="numeric" pattern="[0-9]*">
-      </div>
-    </div>
-    <div class="field">
-      <label>Date of Expense</label>
-      <input type="date" id="edit-date">
-    </div>
-    <div class="field">
-      <label>Paid by</label>
-      <div class="edit-paid-toggle">
-        <div class="paid-opt" id="edit-opt-nakul" onclick="editSelectPayer('nakul')">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>Nakul
-        </div>
-        <div class="paid-opt" id="edit-opt-minal" onclick="editSelectPayer('minal')">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>Minal
-        </div>
-      </div>
-    </div>
-    <div class="field">
-      <label>Category</label>
-      <div class="edit-cat-grid" id="edit-cat-grid"></div>
-    </div>
-    <div class="field">
-      <label>Notes</label>
-      <textarea id="edit-notes" placeholder="What was this for? (optional)" style="min-height:4rem"></textarea>
-    </div>
-    <div class="modal-actions">
-      <button class="modal-btn" onclick="closeEditModal()">Cancel</button>
-      <button class="modal-btn primary" id="edit-save-btn" onclick="saveEdit()">Save Changes</button>
-    </div>
-  </div>
-</div>
 
 <!-- CATEGORY MODAL -->
 <div class="modal-bg" id="catModal">
@@ -767,6 +767,7 @@ async function delEntry(id){
 let editingId=null,editSelPayer='nakul',editSelCat='';
 let isSaving=false;
 const recentSelfEdits=new Map(); // id -> timeout handle, suppress echo re-render
+let editReturnPanelId='tab-history';
 function openEditModal(id){
   const e=expenses.find(x=>String(x.id)===String(id));if(!e)return;
   editingId=String(id);editSelPayer=e.payer;editSelCat=String(e.cat);
@@ -774,27 +775,32 @@ function openEditModal(id){
   document.getElementById('edit-date').value=e.expenseDate||e.date.slice(0,10);
   document.getElementById('edit-notes').value=e.notes||'';
   editSelectPayer(e.payer);renderEditCats();
-  const m=document.getElementById('editModal');
-  const card=m.querySelector('.modal');
-  m.style.display='flex';
-  // Force a reflow so the transition below actually animates
-  void m.offsetHeight;
-  m.style.opacity='1';
-  card.style.opacity='1';
-  card.style.transform='scale(1) translateY(0)';
+
+  // Remember which panel we came from, so Cancel/Save returns there
+  const activePanel=document.querySelector('.panel.active');
+  editReturnPanelId=activePanel?activePanel.id:'tab-history';
+
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('tab-edit').classList.add('active');
+
+  // Hide month nav while editing (matches Add-tab behaviour)
+  const nav=document.getElementById('month-nav');
+  if(nav) nav.style.display='none';
+
+  // Scroll to top so the edit form is fully visible
+  window.scrollTo({top:0,behavior:'instant'});
 }
 function closeEditModal(){
-  const m=document.getElementById('editModal');
-  const card=m.querySelector('.modal');
-  m.style.opacity='0';
-  if(card){card.style.opacity='0';card.style.transform='scale(.96) translateY(8px)';}
-  setTimeout(()=>{ m.style.display='none'; }, 200);
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  const target=document.getElementById(editReturnPanelId)||document.getElementById('tab-history');
+  target.classList.add('active');
+
+  // Restore month nav visibility based on which tab we're returning to
+  const nav=document.getElementById('month-nav');
+  if(nav) nav.style.display=(editReturnPanelId==='tab-add')?'none':'flex';
+
   editingId=null;
 }
-document.getElementById('editModal').addEventListener('click',e=>{
-  if(isSaving) return; // ignore backdrop taps while saving
-  if(e.target===e.currentTarget) closeEditModal();
-});
 function editSelectPayer(p){editSelPayer=p;document.getElementById('edit-opt-nakul').className='paid-opt'+(p==='nakul'?' sel-n':'');document.getElementById('edit-opt-minal').className='paid-opt'+(p==='minal'?' sel-m':'');}
 function editSelectCat(id){editSelCat=String(editSelCat)===String(id)?'':String(id);renderEditCats();}
 function renderEditCats(){
@@ -832,6 +838,8 @@ async function saveEdit(){
 
     closeEditModal();
     renderAll();
+    if(editReturnPanelId==='tab-analysis') renderAnalysis();
+    if(editReturnPanelId==='tab-history') renderLedger();
     toast('✓ Expense updated');
   }catch(err){
     toast('❌ Update failed — check connection');
