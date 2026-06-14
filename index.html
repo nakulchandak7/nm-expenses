@@ -35,6 +35,12 @@ body{background:var(--bg);font-family:'DM Sans',sans-serif;color:var(--ink);min-
 .setup-btn{width:100%;margin-top:1.5rem;font-family:'DM Sans',sans-serif;font-size:.9rem;font-weight:600;padding:.85rem;border-radius:.6rem;border:none;background:var(--ink);color:#fff;cursor:pointer;transition:background .2s,transform .15s}
 .setup-btn:hover{background:#333;transform:translateY(-1px)}
 .setup-err{margin-top:.75rem;padding:.7rem .9rem;background:#fdf0f0;border:1px solid rgba(200,50,50,.2);border-radius:.5rem;font-size:.8rem;color:#c0392b;display:none}
+.splash-spinner{
+  width:.85rem;height:.85rem;border-radius:50%;
+  border:2px solid var(--rule);border-top-color:var(--ink);
+  display:inline-block;animation:spin .7s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
 
 /* ── STATUS ── */
 .status-bar{display:flex;align-items:center;gap:.4rem;font-size:.68rem;color:var(--muted);margin-bottom:.6rem;animation:fadeUp .5s ease .15s both}
@@ -248,8 +254,19 @@ input[type=date]::-webkit-calendar-picker-indicator{opacity:.5;cursor:pointer}
 <body>
 
 <!-- SETUP -->
+<!-- SPLASH SCREEN — shown briefly on load, or if connection fails -->
 <div id="setup-screen">
-  <div class="setup-card">
+  <div class="setup-card" id="splash-card" style="text-align:center">
+    <div class="setup-logo" style="justify-content:center;display:flex;gap:.4rem;font-size:2.6rem"><span>N</span> &amp; <span class="m">M</span></div>
+    <div class="setup-sub" style="margin-bottom:0">Shared Expenses</div>
+    <div id="splash-status" style="margin-top:1.5rem;font-size:.78rem;color:var(--muted);display:flex;align-items:center;justify-content:center;gap:.5rem">
+      <span class="splash-spinner"></span> Connecting…
+    </div>
+    <div id="setup-err" class="setup-err"></div>
+  </div>
+
+  <!-- FALLBACK MANUAL CONFIG — only shown if hardcoded credentials are missing or fail -->
+  <div class="setup-card" id="manual-setup-card" style="display:none">
     <div class="setup-logo"><span>N</span> &amp; <span class="m">M</span></div>
     <div class="setup-sub">Shared Expenses · One-time setup</div>
     <div class="setup-step">
@@ -268,7 +285,7 @@ input[type=date]::-webkit-calendar-picker-indicator{opacity:.5;cursor:pointer}
         <div class="step-hint">Settings → API → anon public key</div>
       </div>
     </div>
-    <div id="setup-err" class="setup-err"></div>
+    <div id="setup-err-manual" class="setup-err"></div>
     <button class="setup-btn" onclick="connectSupabase()">Connect &amp; Start →</button>
     <div style="margin-top:.9rem;font-size:.7rem;color:var(--muted);line-height:1.6">Your keys are saved only on <em>this device</em> in localStorage.</div>
   </div>
@@ -468,6 +485,7 @@ let customCats=[], CATS=[...DEFAULT_CATS];
    STATE
 ══════════════════════════════════════════ */
 let expenses=[], selPayer='nakul', selCat='';
+let openCatId=null;
 
 
 /* ══════════════════════════════════════════
@@ -540,21 +558,27 @@ function filteredExpenses(){
 async function connectSupabase(){
   const url=document.getElementById('cfg-url').value.trim();
   const key=document.getElementById('cfg-key').value.trim();
-  document.getElementById('setup-err').style.display='none';
+  const errEl=document.getElementById('setup-err-manual');
+  if(errEl) errEl.style.display='none';
   if(!url||!url.startsWith('https://')){showSetupErr('Please enter a valid Supabase Project URL');return;}
   if(!key||key.length<20){showSetupErr('Please enter your anon/public API key');return;}
   localStorage.setItem(CFG_URL_KEY,url);
   localStorage.setItem(CFG_KEY_KEY,key);
   await initApp(url,key);
 }
-function showSetupErr(msg){const el=document.getElementById('setup-err');el.textContent=msg;el.style.display='block';}
+function showSetupErr(msg){const el=document.getElementById('setup-err-manual')||document.getElementById('setup-err');el.textContent=msg;el.style.display='block';}
 function resetConfig(){if(!confirm('Remove saved config and return to setup?'))return;localStorage.removeItem(CFG_URL_KEY);localStorage.removeItem(CFG_KEY_KEY);location.reload();}
 
 async function initApp(url,key){
   sbClient=supabase.createClient(url,key);
   const {data,error}=await sbClient.from('expenses').select('*').order('expense_date',{ascending:false});
   if(error){
-    showSetupErr('Connection failed: '+error.message);
+    // Hide splash, show manual config fallback
+    document.getElementById('splash-card').style.display='none';
+    document.getElementById('manual-setup-card').style.display='block';
+    const errEl=document.getElementById('setup-err-manual');
+    errEl.textContent='Connection failed: '+error.message;
+    errEl.style.display='block';
     localStorage.removeItem(CFG_URL_KEY);localStorage.removeItem(CFG_KEY_KEY);return;
   }
   document.getElementById('setup-screen').style.display='none';
@@ -588,13 +612,19 @@ function subscribeRealtime(){
     .on('postgres_changes',{event:'UPDATE',schema:'public',table:'expenses'},payload=>{
       const upd=dbToLocal(payload.new);
       const idx=expenses.findIndex(e=>String(e.id)===String(upd.id));
-      if(idx>-1){
-        const own=String(editingId)===String(upd.id);
-        expenses[idx]=upd;
-        expenses.sort((a,b)=>new Date(b.expenseDate)-new Date(a.expenseDate));
-        renderAll();
-        if(!own) toast('✦ Expense updated');
+      if(idx<0) return;
+
+      // If we just edited this ourselves a moment ago, our local state
+      // is already correct — skip the duplicate full re-render entirely
+      if(recentSelfEdits.has(upd.id)){
+        expenses[idx]=upd; // keep data in sync silently
+        return;
       }
+
+      expenses[idx]=upd;
+      expenses.sort((a,b)=>new Date(b.expenseDate)-new Date(a.expenseDate));
+      renderAll();
+      toast('✦ Expense updated');
     })
     .on('postgres_changes',{event:'DELETE',schema:'public',table:'expenses'},payload=>{
       expenses=expenses.filter(e=>String(e.id)!==String(payload.old.id));
@@ -720,6 +750,8 @@ async function delEntry(id){
 }
 
 let editingId=null,editSelPayer='nakul',editSelCat='';
+let isSaving=false;
+const recentSelfEdits=new Map(); // id -> timeout handle, suppress echo re-render
 function openEditModal(id){
   const e=expenses.find(x=>String(x.id)===String(id));if(!e)return;
   editingId=String(id);editSelPayer=e.payer;editSelCat=String(e.cat);
@@ -729,8 +761,14 @@ function openEditModal(id){
   editSelectPayer(e.payer);renderEditCats();
   document.getElementById('editModal').classList.add('open');
 }
-function closeEditModal(){document.getElementById('editModal').classList.remove('open');editingId=null;}
-document.getElementById('editModal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeEditModal();});
+function closeEditModal(){
+  document.getElementById('editModal').classList.remove('open');
+  editingId=null;
+}
+document.getElementById('editModal').addEventListener('click',e=>{
+  if(isSaving) return; // ignore backdrop taps while saving
+  if(e.target===e.currentTarget) closeEditModal();
+});
 function editSelectPayer(p){editSelPayer=p;document.getElementById('edit-opt-nakul').className='paid-opt'+(p==='nakul'?' sel-n':'');document.getElementById('edit-opt-minal').className='paid-opt'+(p==='minal'?' sel-m':'');}
 function editSelectCat(id){editSelCat=String(editSelCat)===String(id)?'':String(id);renderEditCats();}
 function renderEditCats(){
@@ -739,18 +777,42 @@ function renderEditCats(){
   g.innerHTML=CATS.map(c=>{const cid=String(c.id);return`<div class="cat-pill${cur===cid?' active':''}" onclick="editSelectCat('${cid}')"><span>${c.icon}</span>${c.label}</div>`;}).join('');
 }
 async function saveEdit(){
+  if(isSaving) return; // prevent double-tap submissions
   const amt=Math.round(parseFloat(document.getElementById('edit-amount').value));
   if(!amt||amt<=0){toast('Enter a valid amount');return;}
   const dateVal=document.getElementById('edit-date').value;
   if(!dateVal){toast('Please select a date');return;}
-  const btn=document.getElementById('edit-save-btn');btn.disabled=true;btn.textContent='Saving…';
-  const {data:upd,error}=await sbClient.from('expenses').update({amount:amt,payer:editSelPayer,category:editSelCat||'other',notes:document.getElementById('edit-notes').value.trim(),expense_date:dateVal}).eq('id',editingId).select().single();
-  btn.disabled=false;btn.textContent='Save Changes';
-  if(error){toast('❌ Update failed: '+error.message);return;}
-  const idx=expenses.findIndex(e=>String(e.id)===String(editingId));
-  if(idx>-1)expenses[idx]=dbToLocal(upd);
-  expenses.sort((a,b)=>new Date(b.expenseDate)-new Date(a.expenseDate));
-  closeEditModal();renderAll();toast('✓ Expense updated');
+
+  const btn=document.getElementById('edit-save-btn');
+  const editedId=editingId;
+  isSaving=true;
+  btn.disabled=true;btn.textContent='Saving…';
+
+  try{
+    const {data:upd,error}=await sbClient.from('expenses')
+      .update({amount:amt,payer:editSelPayer,category:editSelCat||'other',notes:document.getElementById('edit-notes').value.trim(),expense_date:dateVal})
+      .eq('id',editedId).select().single();
+
+    if(error){toast('❌ Update failed: '+error.message);return;}
+
+    // Mark this id as "self edited" for a few seconds so the realtime
+    // echo of our own update doesn't trigger a second full re-render
+    if(recentSelfEdits.has(editedId)) clearTimeout(recentSelfEdits.get(editedId));
+    recentSelfEdits.set(editedId, setTimeout(()=>recentSelfEdits.delete(editedId), 4000));
+
+    const idx=expenses.findIndex(e=>String(e.id)===String(editedId));
+    if(idx>-1)expenses[idx]=dbToLocal(upd);
+    expenses.sort((a,b)=>new Date(b.expenseDate)-new Date(a.expenseDate));
+
+    closeEditModal();
+    renderAll();
+    toast('✓ Expense updated');
+  }catch(err){
+    toast('❌ Update failed — check connection');
+  }finally{
+    isSaving=false;
+    btn.disabled=false;btn.textContent='Save Changes';
+  }
 }
 
 
@@ -919,6 +981,14 @@ function renderAnalysis(){
   </div>
   ${monthlyHTML}`;
 
+  // Re-apply previously expanded category (DOM was just rebuilt)
+  if(openCatId){
+    const row=document.getElementById('cbr-'+openCatId);
+    const detail=document.getElementById('cd-'+openCatId);
+    if(row&&detail){row.classList.add('open');detail.classList.add('open');}
+    else{openCatId=null;}
+  }
+
   setTimeout(()=>{
     document.querySelectorAll('#analysis-wrap .bar-fill').forEach(el=>{
       const w=el.style.width;el.style.width='0';requestAnimationFrame(()=>el.style.width=w);
@@ -929,7 +999,6 @@ function renderAnalysis(){
 /* ══════════════════════════════════════════
    CATEGORY DRILL-DOWN
 ══════════════════════════════════════════ */
-let openCatId=null;
 function toggleCatMore(id,count){
   const m=document.getElementById('cat-more-'+id),b=document.getElementById('cat-show-btn-'+id);
   if(!m||!b)return;
@@ -998,13 +1067,26 @@ function toast(msg,dur=2800){const t=document.getElementById('toast');t.textCont
    Once filled in, the setup screen never
    appears on any device ever again.
 ══════════════════════════════════════════ */
-const HARDCODED_URL="";  // paste your Project URL here
-const HARDCODED_KEY="";  // paste your anon key here
+const HARDCODED_URL="https://sbmodsxvdjzprsxzeopx.supabase.co";
+const HARDCODED_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNibW9kc3h2ZGp6cHJzeHplb3B4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1NzM0NjgsImV4cCI6MjA5NjE0OTQ2OH0.pzJchVRZ4D4mtRHWdaw1iZnzyBKzAJv1Ukb2jjpVBvg";
 
 (function autoLoad(){
-  if(HARDCODED_URL&&HARDCODED_KEY){document.getElementById('setup-screen').style.display='none';initApp(HARDCODED_URL,HARDCODED_KEY);return;}
+  if(HARDCODED_URL&&HARDCODED_KEY){
+    initApp(HARDCODED_URL,HARDCODED_KEY);
+    return;
+  }
   const url=localStorage.getItem(CFG_URL_KEY),key=localStorage.getItem(CFG_KEY_KEY);
-  if(url&&key){document.getElementById('cfg-url').value=url;document.getElementById('cfg-key').value=key;initApp(url,key);return;}
+  if(url&&key){
+    document.getElementById('splash-card').style.display='none';
+    document.getElementById('manual-setup-card').style.display='block';
+    document.getElementById('cfg-url').value=url;
+    document.getElementById('cfg-key').value=key;
+    initApp(url,key);
+    return;
+  }
+  // No credentials anywhere — show manual setup immediately
+  document.getElementById('splash-card').style.display='none';
+  document.getElementById('manual-setup-card').style.display='block';
 })();
 </script>
 </body>
